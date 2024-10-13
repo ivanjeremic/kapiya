@@ -1,0 +1,28 @@
+{
+  "name": "kapiya",
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ivan jeremic"
+  ],
+  "author": "Ivan Jeremic",
+  "license": "MIT",
+  "description": "kapiya",
+  "dependencies": {
+    "arctic": "^1.9.2",
+    "nanoid": "^5.0.4",
+    "oslo": "^1.2.1",
+    "@oslojs/crypto": "^1.0.1",
+    "@oslojs/encoding": "^1.1.0",
+    "unstorage": "^1.10.2",
+    "@lucia-auth/adapter-sqlite": "^3.0.2",
+    "better-sqlite3": "^11.3.0"
+  },
+  "devDependencies": {
+    "vitest": "^0.33.0",
+    "@types/better-sqlite3": "^7.6.11"
+  }
+}
