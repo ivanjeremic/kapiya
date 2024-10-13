@@ -36,11 +36,45 @@ export interface User extends UserAttributes {
   id: UserId;
 }
 
+interface DatabaseSession {
+  userId: UserId;
+  expiresAt: Date;
+  id: string;
+  attributes: RegisteredDatabaseSessionAttributes;
+}
+
+interface DatabaseUser {
+  id: UserId;
+  attributes: RegisteredDatabaseUserAttributes;
+}
+
+class Bridge {
+  async getSessionAndUser(
+    sessionId: string
+  ): Promise<[session: DatabaseSession | null, user: DatabaseUser | null]> {
+    return new Promise(() => {});
+  }
+
+  async getUserSessions(userId: UserId): Promise<DatabaseSession[]> {
+    return new Promise(() => {});
+  }
+
+  async setSession(session: DatabaseSession): Promise<void> {}
+
+  async updateSessionExpiration(
+    sessionId: string,
+    expiresAt: Date
+  ): Promise<void> {}
+
+  async deleteSession(sessionId: string): Promise<void> {}
+
+  async deleteUserSessions(userId: UserId): Promise<void> {}
+}
+
 export class KapiyaClient<
   _SessionAttributes extends {} = Record<never, never>,
   _UserAttributes extends {} = Record<never, never>
-> {
-  private adapter: Adapter;
+> extends Bridge {
   private sessionExpiresIn: TimeSpan;
   private sessionCookieController: CookieController;
 
@@ -54,21 +88,17 @@ export class KapiyaClient<
 
   public readonly sessionCookieName: string;
 
-  constructor(
-    adapter: Adapter,
-    options?: {
-      sessionExpiresIn?: TimeSpan;
-      sessionCookie?: SessionCookieOptions;
-      getSessionAttributes?: (
-        databaseSessionAttributes: RegisteredDatabaseSessionAttributes
-      ) => _SessionAttributes;
-      getUserAttributes?: (
-        databaseUserAttributes: RegisteredDatabaseUserAttributes
-      ) => _UserAttributes;
-    }
-  ) {
-    this.adapter = adapter;
-
+  constructor(options?: {
+    sessionExpiresIn?: TimeSpan;
+    sessionCookie?: SessionCookieOptions;
+    getSessionAttributes?: (
+      databaseSessionAttributes: RegisteredDatabaseSessionAttributes
+    ) => _SessionAttributes;
+    getUserAttributes?: (
+      databaseUserAttributes: RegisteredDatabaseUserAttributes
+    ) => _UserAttributes;
+  }) {
+    super();
     // we have to use `any` here since TS can't do conditional return types
     this.getUserAttributes = (databaseUserAttributes): any => {
       if (options && options.getUserAttributes) {
@@ -104,8 +134,8 @@ export class KapiyaClient<
     );
   }
 
-  public async getUserSessions(userId: UserId): Promise<Session[]> {
-    const databaseSessions = await this.adapter.getUserSessions(userId);
+  public async getUserSessionsNow(userId: UserId): Promise<Session[]> {
+    const databaseSessions = await this.getUserSessions(userId);
     const sessions: Session[] = [];
     for (const databaseSession of databaseSessions) {
       if (!isWithinExpirationDate(databaseSession.expiresAt)) {
@@ -125,17 +155,18 @@ export class KapiyaClient<
   public async validateSession(
     sessionId: string
   ): Promise<{ user: User; session: Session } | { user: null; session: null }> {
-    const [databaseSession, databaseUser] =
-      await this.adapter.getSessionAndUser(sessionId);
+    const [databaseSession, databaseUser] = await this.getSessionAndUser(
+      sessionId
+    );
     if (!databaseSession) {
       return { session: null, user: null };
     }
     if (!databaseUser) {
-      await this.adapter.deleteSession(databaseSession.id);
+      await this.deleteSession(databaseSession.id);
       return { session: null, user: null };
     }
     if (!isWithinExpirationDate(databaseSession.expiresAt)) {
-      await this.adapter.deleteSession(databaseSession.id);
+      await this.deleteSession(databaseSession.id);
       return { session: null, user: null };
     }
     const activePeriodExpirationDate = new Date(
@@ -152,10 +183,7 @@ export class KapiyaClient<
     if (!isWithinExpirationDate(activePeriodExpirationDate)) {
       session.fresh = true;
       session.expiresAt = createDate(this.sessionExpiresIn);
-      await this.adapter.updateSessionExpiration(
-        databaseSession.id,
-        session.expiresAt
-      );
+      await this.updateSessionExpiration(databaseSession.id, session.expiresAt);
     }
     const user: User = {
       ...this.getUserAttributes(databaseUser.attributes),
@@ -173,7 +201,7 @@ export class KapiyaClient<
   ): Promise<Session> {
     const sessionId = options?.sessionId ?? generateIdFromEntropySize(25);
     const sessionExpiresAt = createDate(this.sessionExpiresIn);
-    await this.adapter.setSession({
+    await this.setSession({
       id: sessionId,
       userId,
       expiresAt: sessionExpiresAt,
@@ -190,15 +218,15 @@ export class KapiyaClient<
   }
 
   public async invalidateSession(sessionId: string): Promise<void> {
-    await this.adapter.deleteSession(sessionId);
+    await this.deleteSession(sessionId);
   }
 
   public async invalidateUserSessions(userId: UserId): Promise<void> {
-    await this.adapter.deleteUserSessions(userId);
+    await this.deleteUserSessions(userId);
   }
 
   public async deleteExpiredSessions(): Promise<void> {
-    await this.adapter.deleteExpiredSessions();
+    await this.deleteExpiredSessions();
   }
 
   public readSessionCookie(cookieHeader: string): string | null {

@@ -1,7 +1,8 @@
 {
   "name": "kapiya",
   "version": "0.1.0",
-  "main": "index.js",
+  "main": "src/index.ts",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,10 +17,7 @@
     "nanoid": "^5.0.4",
     "oslo": "^1.2.1",
     "@oslojs/crypto": "^1.0.1",
-    "@oslojs/encoding": "^1.1.0",
-    "unstorage": "^1.10.2",
-    "@lucia-auth/adapter-sqlite": "^3.0.2",
-    "better-sqlite3": "^11.3.0"
+    "@oslojs/encoding": "^1.1.0"
   },
   "devDependencies": {
     "vitest": "^0.33.0",

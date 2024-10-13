@@ -1,15 +1,6 @@
-import {
-  AppleCredentials,
-  GitHub,
-  Google,
-  Apple,
-  generateState,
-  Session,
-  DatabaseUserGitHub,
-  CookieAttributes,
-} from ".";
+import { Session, DatabaseUserGitHub, CookieAttributes } from ".";
 import { KapiyaClient } from "./core";
-import { AppleCredentials } from "arctic";
+import { generateState, Apple, AppleCredentials, GitHub } from "arctic";
 
 /**
  * @TUTORIAL https://www.youtube.com/watch?v=v8NJt5REvck
@@ -77,7 +68,7 @@ export class Kapiya {
   private apple: Apple;
 
   constructor({ adapter, prepare, strategies, cookies }: Options) {
-    this.authClient = new KapiyaClient(adapter, {
+    this.authClient = new KapiyaClient({
       sessionCookie: {
         attributes: {
           secure: process.env.NODE_ENV === "production",
