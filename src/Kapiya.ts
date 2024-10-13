@@ -27,7 +27,6 @@ type CookiesType = {
 };
 
 type Options = {
-  adapter: any;
   prepare: () => Promise<void>;
   cookies?: (payload?: any) => CookiesType;
   strategies: {
@@ -67,7 +66,7 @@ export class Kapiya {
   private github: GitHub;
   private apple: Apple;
 
-  constructor({ adapter, prepare, strategies, cookies }: Options) {
+  constructor({ prepare, strategies, cookies }: Options) {
     this.authClient = new KapiyaClient({
       sessionCookie: {
         attributes: {

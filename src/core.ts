@@ -2,7 +2,6 @@ import { TimeSpan, createDate, isWithinExpirationDate } from "./date.js";
 import { CookieController } from "./cookie.js";
 import { generateIdFromEntropySize } from "./crypto.js";
 
-import type { Adapter } from "./database.js";
 import type {
   RegisteredDatabaseSessionAttributes,
   RegisteredDatabaseUserAttributes,
@@ -48,33 +47,47 @@ interface DatabaseUser {
   attributes: RegisteredDatabaseUserAttributes;
 }
 
-class Bridge {
-  async getSessionAndUser(
-    sessionId: string
-  ): Promise<[session: DatabaseSession | null, user: DatabaseUser | null]> {
-    return new Promise(() => {});
-  }
+type CookiesType = {
+  get: (name: string) => any;
+  set: (name: string, value: string, options: CookieAttributes) => any;
+  remove: (name: string, value: string, options: CookieAttributes) => any;
+};
 
-  async getUserSessions(userId: UserId): Promise<DatabaseSession[]> {
-    return new Promise(() => {});
-  }
-
-  async setSession(session: DatabaseSession): Promise<void> {}
-
-  async updateSessionExpiration(
+type BASE<T> = T & {
+  handleSignUp: (user: any) => void;
+  handleSignIn(session: Session): Promise<void>;
+  handleSignOut: (sessionId: string) => Promise<void>;
+  fetchSession: (userId: UserId) => Promise<DatabaseSession[]>;
+  updateSessionExpiry: (
     sessionId: string,
-    expiresAt: Date
-  ): Promise<void> {}
+    updateExpiresAt: Date
+  ) => Promise<void>;
+};
 
-  async deleteSession(sessionId: string): Promise<void> {}
-
-  async deleteUserSessions(userId: UserId): Promise<void> {}
-}
+type Options<T, U> = {
+  prepare: () => Promise<void>;
+  cookies?: (payload?: any) => CookiesType;
+  sessionExpiresIn?: TimeSpan;
+  sessionCookie?: SessionCookieOptions;
+  getSessionAttributes?: (
+    databaseSessionAttributes: RegisteredDatabaseSessionAttributes
+  ) => T;
+  getUserAttributes?: (
+    databaseUserAttributes: RegisteredDatabaseUserAttributes
+  ) => U;
+  strategies: {
+    github?: BASE<{
+      clientId: string;
+      clientSecret: string;
+      enterpriseDomain?: string;
+    }>;
+  };
+};
 
 export class KapiyaClient<
   _SessionAttributes extends {} = Record<never, never>,
   _UserAttributes extends {} = Record<never, never>
-> extends Bridge {
+> {
   private sessionExpiresIn: TimeSpan;
   private sessionCookieController: CookieController;
 
@@ -88,17 +101,19 @@ export class KapiyaClient<
 
   public readonly sessionCookieName: string;
 
-  constructor(options?: {
-    sessionExpiresIn?: TimeSpan;
-    sessionCookie?: SessionCookieOptions;
-    getSessionAttributes?: (
-      databaseSessionAttributes: RegisteredDatabaseSessionAttributes
-    ) => _SessionAttributes;
-    getUserAttributes?: (
-      databaseUserAttributes: RegisteredDatabaseUserAttributes
-    ) => _UserAttributes;
-  }) {
-    super();
+  strategies: {
+    github?: BASE<{
+      clientId: string;
+      clientSecret: string;
+      enterpriseDomain?: string;
+    }>;
+  };
+
+  constructor(options: Options<_SessionAttributes, _UserAttributes>) {
+    if (options && options.prepare) {
+      options.prepare();
+    }
+
     // we have to use `any` here since TS can't do conditional return types
     this.getUserAttributes = (databaseUserAttributes): any => {
       if (options && options.getUserAttributes) {
@@ -106,18 +121,22 @@ export class KapiyaClient<
       }
       return {};
     };
+
     this.getSessionAttributes = (databaseSessionAttributes): any => {
       if (options && options.getSessionAttributes) {
         return options.getSessionAttributes(databaseSessionAttributes);
       }
       return {};
     };
+
     this.sessionExpiresIn = options?.sessionExpiresIn ?? new TimeSpan(30, "d");
     this.sessionCookieName = options?.sessionCookie?.name ?? "auth_session";
     let sessionCookieExpiresIn = this.sessionExpiresIn;
+
     if (options?.sessionCookie?.expires === false) {
       sessionCookieExpiresIn = new TimeSpan(365 * 2, "d");
     }
+
     const baseSessionCookieAttributes: CookieAttributes = {
       httpOnly: true,
       secure: true,
@@ -125,6 +144,7 @@ export class KapiyaClient<
       path: "/",
       ...options?.sessionCookie?.attributes,
     };
+
     this.sessionCookieController = new CookieController(
       this.sessionCookieName,
       baseSessionCookieAttributes,
@@ -132,10 +152,43 @@ export class KapiyaClient<
         expiresIn: sessionCookieExpiresIn,
       }
     );
+
+    /**
+     * client options
+     */
+    if (options && options.strategies) {
+      this.strategies = options.strategies;
+    }
   }
 
-  public async getUserSessionsNow(userId: UserId): Promise<Session[]> {
-    const databaseSessions = await this.getUserSessions(userId);
+  // db
+  private async getSessionAndUser(
+    sessionId: string
+  ): Promise<[session: DatabaseSession | null, user: DatabaseUser | null]> {
+    return new Promise(() => {});
+  }
+
+  // db
+  private async setSession(session: DatabaseSession): Promise<void> {}
+
+  // db
+  private async updateSessionExpiration(
+    sessionId: string,
+    expiresAt: Date
+  ): Promise<void> {}
+
+  // db
+  private async deleteSession(sessionId: string): Promise<void> {}
+
+  // db
+  private async deleteUserSessions(userId: UserId): Promise<void> {}
+
+  /**
+   *
+   * PUBLIC API
+   */
+  public async getUserSessions(userId: UserId): Promise<Session[]> {
+    const databaseSessions = await this.strategies.github!.fetchSession(userId);
     const sessions: Session[] = [];
     for (const databaseSession of databaseSessions) {
       if (!isWithinExpirationDate(databaseSession.expiresAt)) {
