@@ -1,4 +1,4 @@
-import { Session, DatabaseUserGitHub, CookieAttributes } from ".";
+import { Session, CookieAttributes } from "./index";
 import { KapiyaClient } from "./core";
 import { generateState, Apple, AppleCredentials, GitHub } from "arctic";
 
