@@ -20,7 +20,8 @@
     "@oslojs/encoding": "^1.1.0"
   },
   "devDependencies": {
-    "vitest": "^0.33.0",
-    "@types/better-sqlite3": "^7.6.11"
+    "@types/better-sqlite3": "^7.6.11",
+    "jsr": "0.13.2",
+    "vitest": "^0.33.0"
   }
 }
